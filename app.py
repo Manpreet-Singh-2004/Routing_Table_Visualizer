@@ -5,7 +5,7 @@ import time
 
 app = Flask(__name__)
 
-# Network topology: (source, destination) -> cost/weight
+
 NETWORK_TOPOLOGY = {
     ("A", "B"): 1,
     ("B", "A"): 1,
@@ -23,7 +23,7 @@ NETWORK_TOPOLOGY = {
     ("E", "D"): 2,
 }
 
-# Static routing table (pre-computed shortest paths)
+
 STATIC_ROUTING_TABLE = {
     "A": {"A": "A", "B": "B", "C": "B", "D": "C", "E": "C"},
     "B": {"A": "A", "B": "B", "C": "C", "D": "C", "E": "C"},
@@ -91,7 +91,6 @@ def dijkstra(source, destination, failed_links=None):
                 steps.append(
                     f"Updated distance to {neighbor}: {distance} via {current}")
 
-    # Reconstruct path
     path = []
     current = destination
     while current is not None:
@@ -120,7 +119,6 @@ def bellman_ford(source, destination, failed_links=None):
 
     steps.append(f"Starting Bellman-Ford from {source} to {destination}")
 
-    # Relax edges |V| - 1 times
     for iteration in range(len(NODES) - 1):
         updated = False
         steps.append(f"\nIteration {iteration + 1}:")
@@ -140,7 +138,6 @@ def bellman_ford(source, destination, failed_links=None):
             steps.append("  No updates, converged early")
             break
 
-    # Check for negative cycles
     for (u, v), cost in NETWORK_TOPOLOGY.items():
         if (u, v) in failed_links:
             continue
@@ -148,7 +145,6 @@ def bellman_ford(source, destination, failed_links=None):
             steps.append("Negative cycle detected!")
             return None, float('inf'), steps, iteration + 1
 
-    # Reconstruct path
     path = []
     current = destination
     while current is not None:
@@ -188,13 +184,11 @@ def static_routing(source, destination, failed_links=None):
             decisions.append(f"No route to {destination} from {current}")
             return None, float('inf'), decisions
 
-        # Check if link is failed
         if (current, next_hop) in failed_links:
             decisions.append(
                 f"Link {current}->{next_hop} failed. Static routing cannot adapt.")
             return None, float('inf'), decisions
 
-        # Get cost
         cost = NETWORK_TOPOLOGY.get((current, next_hop), 1)
         total_cost += cost
 
@@ -231,7 +225,7 @@ def hop_count_routing(source, destination, failed_links=None):
         steps.append(f"Exploring {current}, current path: {' -> '.join(path)}")
 
         if current == destination:
-            cost = len(path) - 1  # hop count
+            cost = len(path) - 1 
             steps.append(f"Found destination with {cost} hops")
             return path, cost, steps
 
@@ -263,7 +257,6 @@ def index():
             else:
                 path, cost, decisions = static_routing(src, dst)
 
-    # Convert topology tuples to JSON-serializable format
     topology_json = {}
     for (src_node, dst_node), cost in NETWORK_TOPOLOGY.items():
         key = f"{src_node},{dst_node}"
@@ -289,7 +282,6 @@ def compute():
     algorithm = data.get("algorithm", "dijkstra")
     failed_links_list = data.get("failed_links", [])
 
-    # Convert failed links to set of tuples
     failed_links = set()
     for link in failed_links_list:
         parts = link.split("-")
@@ -329,7 +321,7 @@ def compute():
         return jsonify({"error": "Invalid algorithm"}), 400
 
     end_time = time.time()
-    execution_time = (end_time - start_time) * 1000  # in milliseconds
+    execution_time = (end_time - start_time) * 1000 
     metrics["time_ms"] = round(execution_time, 4)
 
     return jsonify({
@@ -357,7 +349,6 @@ def compare():
 
     results = {}
 
-    # Dijkstra
     start = time.time()
     path, cost, steps, nodes_explored = dijkstra(
         source, destination, failed_links)
@@ -368,7 +359,6 @@ def compare():
         "nodes_explored": len(nodes_explored)
     }
 
-    # Bellman-Ford
     start = time.time()
     path, cost, steps, iterations = bellman_ford(
         source, destination, failed_links)
@@ -379,7 +369,6 @@ def compare():
         "iterations": iterations
     }
 
-    # Static
     start = time.time()
     path, cost, steps = static_routing(source, destination, failed_links)
     results["static"] = {
@@ -388,7 +377,6 @@ def compare():
         "time_ms": round((time.time() - start) * 1000, 4)
     }
 
-    # Hop Count
     start = time.time()
     path, cost, steps = hop_count_routing(source, destination, failed_links)
     results["hop_count"] = {
@@ -402,3 +390,4 @@ def compare():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
