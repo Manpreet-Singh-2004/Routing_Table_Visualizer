@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Routing Table Visualizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-50 min-h-screen py-8 px-4">
+
+  <div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="bg-white rounded-xl shadow-md p-8 mb-6 border border-slate-200">
+      <h1 class="text-4xl font-semibold text-slate-800 mb-3">🌐 Interactive Routing Visualizer</h1>
+      <p class="text-slate-600 text-lg">
+        Explore routing algorithms including 
+        <strong class="text-sky-600">Static Routing, Dijkstra, Bellman-Ford, and Hop-Count (BFS)</strong>.  
+        Select settings and watch the path animate on the network.
+      </p>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-6">
+
+      <!-- Left Panel -->
+      <div class="lg:col-span-1">
+        <div class="bg-white rounded-xl shadow-md p-6 sticky top-6 border border-slate-200">
+
+          <h2 class="text-xl font-semibold text-slate-800 mb-4">🎯 Route Configuration</h2>
+
+          <form id="routeForm" class="space-y-4">
+
+            <!-- Source -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-2">Source Router</label>
+              <select id="source" required
+                class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-sky-500 bg-white">
+                <option value="" disabled selected>Select source</option>
+                {% for n in nodes %}
+                <option value="{{ n }}">{{ n }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Destination -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-2">Destination Router</label>
+              <select id="destination" required
+                class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-sky-500 bg-white">
+                <option value="" disabled selected>Select destination</option>
+                {% for n in nodes %}
+                <option value="{{ n }}">{{ n }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Algorithm Selection -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-2">Routing Algorithm</label>
+              <select id="algorithm"
+                class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-sky-500 bg-white">
+                <option value="static">Static Routing</option>
+                <option value="dijkstra">Dijkstra</option>
+                <option value="bellman_ford">Bellman-Ford</option>
+                <option value="hop_count">Hop Count (BFS)</option>
+              </select>
+            </div>
+
+            <!-- Submit -->
+            <button type="submit"
+              class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold py-3 px-6 rounded-lg">
+              🚀 Compute Route
+            </button>
+          </form>
+
+          <!-- Legend -->
+          <div class="mt-6 pt-6 border-t border-slate-200">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3">📖 Legend</h3>
+            <div class="space-y-2 text-sm">
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 rounded-full bg-slate-400"></div>
+                <span class="text-slate-600">Inactive Node</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 rounded-full bg-emerald-500"></div>
+                <span class="text-slate-600">Source Node</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 rounded-full bg-rose-500"></div>
+                <span class="text-slate-600">Destination Node</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 rounded-full bg-sky-500"></div>
+                <span class="text-slate-600">Active Path Node</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-1 bg-sky-600"></div>
+                <span class="text-slate-600">Active Path Link</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div class="lg:col-span-2 space-y-6">
+
+        <!-- Network Canvas -->
+        <div class="bg-white rounded-xl shadow-md p-8 border border-slate-200">
+          <h2 class="text-2xl font-semibold text-slate-800 mb-4">🗺️ Network Topology Map</h2>
+          <div class="bg-slate-100 rounded-xl p-4">
+            <canvas id="networkCanvas" width="800" height="500" class="w-full"></canvas>
+          </div>
+          <p class="text-sm text-slate-500 mt-3 text-center">Interactive network visualization with 5 routers (A–E)</p>
+        </div>
+
+        <!-- Dynamic Results -->
+        <div id="resultsContainer"></div>
+
+        <!-- Routing Table -->
+        <div class="bg-white rounded-xl shadow-md p-8 border border-slate-200">
+          <h2 class="text-2xl font-semibold text-slate-800 mb-3">📊 Static Routing Table</h2>
+          <p class="text-slate-600 mb-6">Pre-computed next-hop information for each router-destination pair.</p>
+
+          <div class="overflow-x-auto rounded-lg border border-slate-200">
+            <table class="min-w-full divide-y divide-slate-200">
+              <thead class="bg-sky-600">
+                <tr>
+                  <th class="px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">Router</th>
+                  <th class="px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">Destination</th>
+                  <th class="px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">Next Hop</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-slate-200">
+                {% for router, entries in routing_table.items() %}
+                {% for dst_node, nh in entries.items() %}
+                <tr class="hover:bg-slate-50 transition duration-150">
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center justify-center w-8 h-8 bg-slate-100 text-slate-700 font-bold rounded-full">
+                      {{ router }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center justify-center w-8 h-8 bg-slate-100 text-slate-700 font-bold rounded-full">
+                      {{ dst_node }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-sky-100 text-sky-700">
+                      {{ nh }}
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <div class="text-center mt-8 text-slate-600">
+      <p class="text-sm">Built with Flask & Tailwind CSS | Multi-Algorithm Routing Simulator</p>
+    </div>
+  </div>
+
+  <!-- JS Backend + Canvas Logic -->
+  <script>
+    const topologyRaw = {{ topology|tojson|safe }};
+    const routingTable = {{ routing_table|tojson|safe }};
+
+    const topologyLinks = [];
+    for (const [key, cost] of Object.entries(topologyRaw)) {
+      const [src, dst] = key.split(',');
+      topologyLinks.push({ src, dst, cost });
+    }
+
+    let selectedPath = null;
+
+    // Handle Compute
+    document.getElementById("routeForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const source = document.getElementById("source").value;
+      const destination = document.getElementById("destination").value;
+      const algorithm = document.getElementById("algorithm").value;
+
+      const response = await fetch("/compute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source, destination, algorithm, failed_links: [] })
+      });
+
+      const result = await response.json();
+      console.log(result);
+
+      selectedPath = result.path || [];
+
+      renderResults(result);
+      drawNetwork();
+    });
+
+    function renderResults(result) {
+      const container = document.getElementById("resultsContainer");
+
+      if (!result.success) {
+        container.innerHTML = `
+        <div class="bg-white rounded-xl shadow-md p-8 border border-rose-300">
+          <p class="text-rose-600 text-lg font-semibold">❌ No valid path found.</p>
+        </div>`;
+        return;
+      }
+
+      const pathStr = result.path.join(" → ");
+
+      container.innerHTML = `
+      <div class="bg-white rounded-xl shadow-md p-8 border border-slate-200">
+        <h2 class="text-2xl font-semibold text-slate-800 mb-4">📍 Routing Results</h2>
+
+        <div class="bg-slate-50 border-l-4 border-emerald-500 p-6 rounded-r-lg mb-6">
+          <p class="text-sm font-semibold text-emerald-700 mb-1">Selected Path:</p>
+          <p class="text-2xl font-bold text-slate-900">${pathStr}</p>
+          <p class="text-sm mt-2 text-slate-600">Cost: <strong>${result.cost}</strong></p>
+          <p class="text-sm text-slate-600">Execution Time: <strong>${result.metrics.time_ms} ms</strong></p>
+        </div>
+
+        <h3 class="text-xl font-semibold text-slate-800 mb-4">🔍 Steps</h3>
+        <div class="bg-slate-50 rounded-lg p-6 max-h-64 overflow-y-auto">
+          <ul class="space-y-3">
+            ${result.steps.map((s, i) => `
+              <li class="flex items-start">
+                <span class="inline-block w-6 h-6 bg-sky-600 text-white rounded-full flex items-center justify-center text-xs font-bold mr-3">${i + 1}</span>
+                <span class="text-slate-700">${s}</span>
+              </li>`).join("")}
+          </ul>
+        </div>
+      </div>`;
+    }
+
+    // Canvas and Animation Logic
+    const nodePositions = {
+      'A': { x: 150, y: 100 },
+      'B': { x: 400, y: 80 },
+      'C': { x: 550, y: 250 },
+      'D': { x: 350, y: 400 },
+      'E': { x: 100, y: 320 }
+    };
+
+    const canvas = document.getElementById('networkCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      const container = canvas.parentElement;
+      const rect = container.getBoundingClientRect();
+      canvas.width = rect.width - 32;
+      canvas.height = 500;
+      drawNetwork();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    function drawNetwork() {
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const scale = canvas.width / 700;
+      const drawnLinks = new Set();
+
+      // Draw Links
+      for (const link of topologyLinks) {
+        const { src, dst, cost } = link;
+        const key = [src, dst].sort().join('-');
+        if (drawnLinks.has(key)) continue;
+        drawnLinks.add(key);
+
+        const pos1 = nodePositions[src];
+        const pos2 = nodePositions[dst];
+        if (!pos1 || !pos2) continue;
+
+        let isActive = false;
+        if (selectedPath) {
+          for (let i = 0; i < selectedPath.length - 1; i++) {
+            const a = selectedPath[i];
+            const b = selectedPath[i + 1];
+            if ((a === src && b === dst) || (a === dst && b === src)) {
+              isActive = true;
+              break;
+            }
+          }
+        }
+
+        ctx.beginPath();
+        ctx.strokeStyle = isActive ? '#0284c7' : '#cbd5e1';
+        ctx.lineWidth = isActive ? 5 : 2;
+        ctx.moveTo(pos1.x * scale, pos1.y);
+        ctx.lineTo(pos2.x * scale, pos2.y);
+        ctx.stroke();
+
+        const midX = (pos1.x + pos2.x) / 2 * scale;
+        const midY = (pos1.y + pos2.y) / 2;
+
+        ctx.fillStyle = 'white';
+        ctx.fillRect(midX - 15, midY - 15, 30, 20);
+
+        ctx.fillStyle = isActive ? '#0284c7' : '#64748b';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(cost), midX, midY - 5);
+      }
+
+      // Draw Nodes
+      for (const [node, pos] of Object.entries(nodePositions)) {
+        const x = pos.x * scale;
+        const y = pos.y;
+
+        let color = '#94a3b8';
+        let stroke = '#64748b';
+
+        if (selectedPath) {
+          if (selectedPath[0] === node) {
+            color = '#10b981'; stroke = '#059669';
+          } else if (selectedPath[selectedPath.length - 1] === node) {
+            color = '#f43f5e'; stroke = '#e11d48';
+          } else if (selectedPath.includes(node)) {
+            color = '#0ea5e9'; stroke = '#0284c7';
+          }
+        }
+
+        ctx.beginPath();
+        ctx.arc(x, y, 30, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 24px sans-serif';
+        ctx.fillText(node, x, y);
+      }
+
+      if (selectedPath && selectedPath.length > 1) {
+        animatePacket();
+      }
+    }
+
+    let anim = 0;
+    function animatePacket() {
+      const speed = 0.02;
+      const idx = Math.floor(anim) % (selectedPath.length - 1);
+      const progress = anim % 1;
+
+      const scale = canvas.width / 700;
+      const from = nodePositions[selectedPath[idx]];
+      const to = nodePositions[selectedPath[idx + 1]];
+
+      const x = (from.x + (to.x - from.x) * progress) * scale;
+      const y = from.y + (to.y - from.y) * progress;
+
+      ctx.beginPath();
+      ctx.arc(x, y, 12, 0, 2 * Math.PI);
+      ctx.fillStyle = '#facc15';
+      ctx.fill();
+
+      ctx.strokeStyle = '#eab308';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('📦', x, y);
+
+      anim += speed;
+      requestAnimationFrame(drawNetwork);
+    }
+
+    setTimeout(resizeCanvas, 100);
+  </script>
+</body>
+</html>
