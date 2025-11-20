@@ -89,4 +89,4 @@ Navigate to http://127.0.0.1:5000 in your web browser.
 
 - Steps: A list of strings explaining each step the algorithm took.
 
-- Visual: The computed path is highlighted on the canvas.
+- Visual: The computed path is highlighted on the canvas
